@@ -12,7 +12,7 @@ fs=48000
 V=343
 
 
-vctk=torchaudio.datasets.VCTK('./')
+# vctk=torchaudio.datasets.VCTK('./')
 from util import randomEqualize
 # vctk adapter
 class VCTKAudio:
@@ -70,11 +70,11 @@ class FuseDataset:
         
         return None
 
-vctk_audio=VCTKAudio(vctk, portion=(0, int(len(vctk)*0.8)))
-vctk_test=VCTKAudio(vctk, portion=(int(len(vctk)*0.8), len(vctk)))
+# vctk_audio=VCTKAudio(vctk, portion=(0, int(len(vctk)*0.8)))
+# vctk_test=VCTKAudio(vctk, portion=(int(len(vctk)*0.8), len(vctk)))
 
-wham=WHAM('./wham_noise/tr')
-wham_test=WHAM('./wham_noise/cv')
+# wham=WHAM('./wham_noise/tr')
+# wham_test=WHAM('./wham_noise/cv')
 
 # MS dataset
 class MS_SNSD:
@@ -106,20 +106,20 @@ class MS_SNSD:
             
         return np.stack(mic_sig_batch)
 
-ms_snsd=MS_SNSD('./MS-SNSD', test=False, train=True)
-ms_snsd_test=MS_SNSD('./MS-SNSD', test=True, train=False)
+# ms_snsd=MS_SNSD('./MS-SNSD', test=False, train=True)
+# ms_snsd_test=MS_SNSD('./MS-SNSD', test=True, train=False)
 
 # define datasets
-noisesets=FuseDataset(ms_snsd, wham)
-noisesets_test=FuseDataset(ms_snsd_test, wham_test)
-audiosets=vctk_audio
-audiosets_test=vctk_test
+# noisesets=FuseDataset(ms_snsd, wham)
+# noisesets_test=FuseDataset(ms_snsd_test, wham_test)
+# audiosets=vctk_audio
+# audiosets_test=vctk_test
 
 # acoustic property
 N_MIC=6
 R_MIC=0.0463
 
-import pyroomacoustics as pra
+# import pyroomacoustics as pra
 def generate_mic_array(mic_radius: float, n_mics: int, pos):
     """
     Generate a list of Microphone objects
@@ -131,7 +131,7 @@ def generate_mic_array(mic_radius: float, n_mics: int, pos):
     return R
 
 # global mic array:
-R_global=generate_mic_array(R_MIC, N_MIC, (0,0,0))
+# R_global=generate_mic_array(R_MIC, N_MIC, (0,0,0))
 
 # simulate the room
 
@@ -477,7 +477,7 @@ simulation_config={
 truncator=RandomTruncate(4*fs, 5, 0.4)
 
 # no cache for the original dataset
-dataset=OnlineSimulationDataset(audiosets, noisesets, 8000, simulation_config, truncator, None)
+# dataset=OnlineSimulationDataset(audiosets, noisesets, 8000, simulation_config, truncator, None)
 
 # beamformer test
 import beamformer
@@ -488,10 +488,10 @@ buffer_size_webrtc=384 # 8ms
 buffer_size_mvdr=384
 webrtc_path='LD_LIBRARY_PATH=./lib/ ./beamform_mic_array'
 
-beamformers=[WebrtcBeamformer(buffer_size_webrtc, R_global, fs, webrtc_path, cache_path), 
-             OnlineMVDRBeamformer(buffer_size_mvdr, R_global, fs, V, False), # superdirective
-             OnlineMVDRBeamformer(buffer_size_mvdr, R_global, fs, V, True, True, False) # online mvdr
-            ]
+# beamformers=[WebrtcBeamformer(buffer_size_webrtc, R_global, fs, webrtc_path, cache_path), 
+#              OnlineMVDRBeamformer(buffer_size_mvdr, R_global, fs, V, False), # superdirective
+#              OnlineMVDRBeamformer(buffer_size_mvdr, R_global, fs, V, True, True, False) # online mvdr
+#             ]
 
 from util import alignChannel
 from scipy.signal import resample
@@ -577,7 +577,7 @@ class SimulationBeamformedDataset():
 import util
 from util import si_sdr, calculate_gain
 
-train_dataset=SimulationBeamformedDataset(dataset, beamformers, './bf_cache', 8100, True, sample_offset=8)
+# train_dataset=SimulationBeamformedDataset(dataset, beamformers, './bf_cache', 8100, True, sample_offset=8)
 
 simulation_config_test={
     'seed':5,
@@ -601,8 +601,8 @@ simulation_config_test={
     'no_reverb_ratio':0
 }
 
-testset=OnlineSimulationDataset(audiosets_test,noisesets_test, 300, simulation_config_test, truncator, None)
-test_dataset=SimulationBeamformedDataset(testset, beamformers, './bf_cache_test', 600, True, sample_offset=8)
+# testset=OnlineSimulationDataset(audiosets_test,noisesets_test, 300, simulation_config_test, truncator, None)
+# test_dataset=SimulationBeamformedDataset(testset, beamformers, './bf_cache_test', 600, True, sample_offset=8)
 
 import time
 import torch
@@ -615,8 +615,8 @@ batch_mul=1
 
 cuda_id=None
 
-dataloader=torch.utils.data.DataLoader(train_dataset, batch_size=BATCH, shuffle=True, num_workers=4)
-testloader=torch.utils.data.DataLoader(test_dataset, batch_size=BATCH, shuffle=False, num_workers=4)
+# dataloader=torch.utils.data.DataLoader(train_dataset, batch_size=BATCH, shuffle=True, num_workers=4)
+# testloader=torch.utils.data.DataLoader(test_dataset, batch_size=BATCH, shuffle=False, num_workers=4)
 
 def train_epoch(model, lossmodel, optimizer, scheduler, dataloader, save_path=None, last_loss=None):
     model.train()
@@ -694,11 +694,11 @@ class FuseLoss(nn.Module):
             return self.l1loss(signal[..., self.offset+self.lookahead:], gt[..., self.offset:-self.lookahead])*self.r+torch.mean(self.sisdrloss(signal[..., self.offset+self.lookahead:], gt[..., self.offset:-self.lookahead]))
     
 
-network=BeamformerModel(ch_in=9, synth_mid=64, synth_hid=96, block_size=16, kernel=3, synth_layer=4, synth_rep=4, lookahead=0)
+network=BeamformerModel(ch_in=1, synth_mid=64, synth_hid=96, block_size=16, kernel=3, synth_layer=4, synth_rep=4, lookahead=0)
 loss_net=FuseLoss(12000, 10)
 
-network=network.cuda(cuda_id)
-loss_net=loss_net.cuda(cuda_id)
+# network=network.cuda(cuda_id)
+# loss_net=loss_net.cuda(cuda_id)
 
 # evaluate
 def test_epoch(model, lossmodel, testloader):
@@ -765,23 +765,41 @@ def generate_data():
 
 
 def load_path(model, path):
-    model.load_state_dict(torch.load(path), strict=False)
+    model.load_state_dict(torch.load(path,map_location=torch.device('cpu')), strict=False)
 
-def test_data(modelpath, filepath, destination):
-    load_path(network, modelpath)
-    sig=librosa.load(filepath, sr=16000, mono=False)[0]
-    result=network(sig[..., :-8])
-    from scipy.io import wavfile
-    wavfile.write(destination, 16000, result.reshape((-1,)))
+def test_data(modelpath):
+    load_path(network,modelpath)
+    
+    pytorch_total_params = sum(p.numel() for p in network.parameters())
+    print (pytorch_total_params)
+    print (network)
 
-import sys
-if __name__ == "__main__":
-    if sys.argv[1]=='data':
-        generate_data()
-    elif sys.argv[1]=='train':
-        train()
-    elif sys.argv[1]=='test':
-        modelpath=sys.argv[2]
-        filepath=sys.argv[3]
-        dest=sys.argv[4]
-        test_data(modelpath, filepath, dest)
+    # sig=librosa.load(filepath, sr=16000, mono=False)
+    # print (len(sig))
+
+    # print ('siglen ',sig[0].shape)
+    # print ('fs ',sig[1])
+
+    # sig=sig[0]
+    # sig=sig[..., :-8]
+    # print (sig.shape)
+
+    sig = torch.randn(1,1,63)
+    start=time.time()
+    result=network(sig)
+    print ('PASSED ',((time.time()-start))*1000)
+
+    # from scipy.io import wavfile
+    # wavfile.write(destination, 16000, result.reshape((-1,)))
+
+# import sys
+# if __name__ == "__main__":
+#     if sys.argv[1]=='data':
+#         generate_data()
+#     elif sys.argv[1]=='train':
+#         train()
+#     elif sys.argv[1]=='test':
+modelpath='pretrained_6mic.bin'
+# filepath='test_mixture.wav'
+# dest='out.wav'
+test_data(modelpath)
