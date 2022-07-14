@@ -52,6 +52,38 @@ def cMul(t1,t2):
     imag=t1[1]*t2[0]+t1[0]*t2[1]
     return (real,imag)
 
+# class STFT(torch.nn.Module):
+#     def __init__(self, win_length, hop_length, window_periodic = True, stft_mode = None):
+#         super().__init__()
+#         self.win_length = win_length
+#         self.hop_length = hop_length
+#         self.nfft = 2**math.ceil(math.log2(self.win_length))
+#         self.freq_cutoff = self.nfft // 2 + 1
+#         self.register_buffer('window', getattr(torch, window)(self.win_length, periodic = window_periodic).float())
+#         if stft_mode == 'conv':
+#         fourier_basis = torch.rfft(torch.eye(self.nfft), signal_ndim = 1, onesided = False)
+#         forward_basis = fourier_basis[:self.freq_cutoff].permute(2, 0, 1).reshape(-1, 1, fourier_basis.shape[1])
+#         forward_basis = forward_basis * torch.as_tensor(
+#                 librosa.util.pad_center(self.window, self.nfft), dtype = forward_basis.dtype
+#             )
+#         self.stft = torch.nn.Conv1d(
+#             forward_basis.shape[1],
+#             forward_basis.shape[0],
+#             forward_basis.shape[2],
+#             bias = False,
+#             stride = self.hop_length
+#         ).requires_grad_(False)
+#         self.stft.weight.copy_(forward_basis)
+#     else:
+#         self.stft = None
+
+#     def forward(self, signal):
+#         pad = self.freq_cutoff - 1
+#         padded_signal = torch.nn.functional.pad(signal.unsqueeze(1), (pad, pad), mode = 'reflect').squeeze(1))
+#         real, imag = self.stft(padded_signal.unsqueeze(dim = 1)).split(self.freq_cutoff, dim = 1) if self.stft is not None else padded_signal.stft(self.nfft, hop_length = self.hop_length, win_length = self.win_length, window = self.window, center = False).unbind(dim = -1)
+#         return real, imag
+
+import math
 class ComplexSTFTWrapper(nn.Module):
     def __init__(self, win_length, hop_length, center=True):
         super(ComplexSTFTWrapper,self).__init__()
@@ -62,9 +94,37 @@ class ComplexSTFTWrapper(nn.Module):
     def transform(self, input_data):
         B,C,L=input_data.shape
         input_data=input_data.view(B*C, L)
-        r=torch.stft(input_data, n_fft=self.win_length, hop_length=self.hop_length, center=self.center, return_complex=False)
-        _,F,T,_=r.shape
-        r=r.view(B,C,F,T,2)
+        # r=torch.stft(input_data, n_fft=self.win_length, hop_length=self.hop_length, center=self.center, return_complex=False)
+
+        # # INIT
+        # self.nfft = 2**math.ceil(math.log2(self.win_length))
+        # self.freq_cutoff = self.nfft
+        # self.register_buffer('window', getattr(torch, window)(self.win_length, periodic = window_periodic).float())
+
+        # fourier_basis = torch.rfft(torch.eye(self.nfft), signal_ndim = 1, onesided = False)
+        # forward_basis = fourier_basis[:self.freq_cutoff].permute(2, 0, 1).reshape(-1, 1, fourier_basis.shape[1])
+        # forward_basis = forward_basis * torch.as_tensor(
+        #         librosa.util.pad_center(self.window, self.nfft), dtype = forward_basis.dtype
+        #     )
+        # self.stft = torch.nn.Conv1d(
+        #     forward_basis.shape[1],
+        #     forward_basis.shape[0],
+        #     forward_basis.shape[2],
+        #     bias = False,
+        #     stride = self.hop_length
+        # ).requires_grad_(False)
+        # self.stft.weight.copy_(forward_basis)
+
+        # # FORWARD
+        # pad = self.freq_cutoff - 1
+        # padded_signal = torch.nn.functional.pad(signal.unsqueeze(1), (pad, pad), mode = 'reflect').squeeze(1)
+        # real, imag = self.stft(padded_signal.unsqueeze(dim = 1)).split(self.freq_cutoff, dim = 1) if self.stft is not None else padded_signal.stft(self.nfft, hop_length = self.hop_length, win_length = self.win_length, window = self.window, center = False).unbind(dim = -1)
+
+        # _,F,T,_=r.shape
+        # r=r.view(B,C,F,T,2)
+        # print ('SHAPE ',r.shape)
+        
+        r = torch.randn(1,1,17,16,2)
         return (r[...,0], r[..., 1])
                               
     def reverse(self, input_data):
