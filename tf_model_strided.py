@@ -1,23 +1,26 @@
 import tensorflow.compat.v1 as tf
+import time
+import numpy as np
 tf.compat.v1.disable_eager_execution()
+from tensorflow.keras import datasets, layers, models, losses
 
 datatype=tf.float32
 
-def conv1d(name, inputs, kernel, ch_in, ch_out, dilation):
+def conv1d(name, inputs, kernel, chan_in, chan_out, dilation):
     y=tf.pad(inputs, tf.constant([[0,0], [0,0], [dilation*(kernel-1), 0], [0,0]]))
-    y=tf.layers.conv2d(y, ch_out, (1, kernel), padding='VALID', data_format='channels_last', dilation_rate=(1, dilation), bias_initializer=tf.random_normal_initializer(), kernel_initializer=tf.random_normal_initializer())
+    y=tf.layers.conv2d(y, chan_out, (1, kernel), padding='VALID', data_format='channels_last', dilation_rate=(1, dilation), bias_initializer=tf.random_normal_initializer(), kernel_initializer=tf.random_normal_initializer())
     return y
 
-def conv1d_pad(name, inputs, kernel, ch_in, ch_out, dilation, relu=False):
-    prev_inputs=tf.placeholder(datatype, [None, 1, dilation*(kernel-1), ch_in])
+def conv1d_pad(name, inputs, kernel, chan_in, chan_out, dilation, relu=False):
+    prev_inputs=tf.placeholder(datatype, [None, 1, dilation*(kernel-1), chan_in])
     y=tf.concat([inputs, prev_inputs], 2)
     next_inputs=tf.slice(y, [0,0,y.get_shape()[2]-dilation*(kernel-1),0], [y.get_shape()[0],y.get_shape()[1],dilation*(kernel-1),y.get_shape()[3]])
-    y=tf.layers.conv2d(y, ch_out, (1, kernel), padding='VALID', data_format='channels_last', dilation_rate=(1, dilation), bias_initializer=tf.random_normal_initializer(), kernel_initializer=tf.random_normal_initializer(), activation=(tf.nn.relu if relu else None))
+    y=tf.layers.conv2d(y, chan_out, (1, kernel), padding='VALID', data_format='channels_last', dilation_rate=(1, dilation), bias_initializer=tf.random_normal_initializer(), kernel_initializer=tf.random_normal_initializer(), activation=(tf.nn.relu if relu else None))
 
     return prev_inputs, next_inputs, y
 
-def conv11(name, inputs, ch_in, ch_out):
-    y=tf.layers.conv2d(inputs, ch_out, (1, 1), padding='VALID', data_format='channels_last', bias_initializer=tf.random_normal_initializer(), kernel_initializer=tf.random_normal_initializer())
+def conv11(name, inputs, chan_in, chan_out):
+    y=tf.layers.conv2d(inputs, chan_out, (1, 1), padding='VALID', data_format='channels_last', bias_initializer=tf.random_normal_initializer(), kernel_initializer=tf.random_normal_initializer())
     return y
     
 def complex_gate(mask, x):
@@ -35,10 +38,12 @@ def complex_gate(mask, x):
     return tf.concat([res_real, res_imag], 3)
     
 # ch_in: 18 (9*2); ch: 512 (256*2); synth_mid:128 (64*2); synth_hid: 192 (96*2); block_size:32; freq: 32; kernel: 3; synth_layer: 4; synth_rep:4  
-def model_pad_strided(T, ch_in, ch_mid, ch, synth_mid, synth_hid, block_size, freq, kernel, synth_layer, synth_rep, sess):
+def model_pad_strided(x, T, chan_in, chan_mid, chan, synth_mid, synth_hid, block_size, freq, kernel, synth_layer, synth_rep, sess):
     F=block_size
-    x=tf.placeholder(datatype, [1, T, F, ch_in])
-    
+    # x=tf.placeholder(datatype, [1, T, F, chan_in])
+    # print ('model_pad_strided')
+    # print (x.shape)
+
     xs=[]
     ys=[]
     # layers
@@ -46,12 +51,12 @@ def model_pad_strided(T, ch_in, ch_mid, ch, synth_mid, synth_hid, block_size, fr
         #set_session(sess)
         assert(freq==x.shape[2])
         with tf.variable_scope("model3"):
-            y=tf.reshape(x, (-1,1,T,F*ch_in))
-            y=conv11('map', y, ch_in*F, ch)
+            y=tf.reshape(x, (-1,1,T,F*chan_in))
+            y=conv11('map', y, chan_in*F, chan)
             
             yshort=y
 
-            y=conv11('map2', y, ch, synth_mid)
+            y=conv11('map2', y, chan, synth_mid)
 
             res_sum=None
             for i in range(synth_rep):
@@ -80,13 +85,29 @@ def model_pad_strided(T, ch_in, ch_mid, ch, synth_mid, synth_hid, block_size, fr
                         y=y1+yres
                     dilation*=kernel
                         
-
             y=conv11('reduce1', y, synth_mid, synth_hid)
             y=tf.nn.relu(y)
-            y=conv11('reduce2', y, synth_hid, ch)
+            y=conv11('reduce2', y, synth_hid, chan)
             y=complex_gate(y, yshort)
-            y=conv11('final', y, ch, F)
+            y=conv11('final', y, chan, F)
             return xs, ys, y
     
     return x, forward
-    
+
+class DeepBeamModel(tf.keras.Model):
+  def __init__(self):
+    super(DeepBeamModel, self).__init__(name='')
+
+  def call(self, input_tensor, training=False):
+    x,self.myforward=model_pad_strided(input_tensor, 192, 18, 0, 512, 128, 192, 32, 32, 3, 4, 4, 0)
+    return x
+
+block = DeepBeamModel()
+input_tensor = tf.zeros([1,192,32,18],dtype=datatype)
+block.build((1,192,32,18))
+block.summary()
+
+s=time.time()
+block(input_tensor=input_tensor)
+print ((time.time()-s)*1000)
+block.save('model.pb')
